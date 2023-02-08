@@ -1,0 +1,30 @@
+Steps to Create the TeleBot Group that will receive the Messages
+1. Open Telegram App on your phone
+2. Search for BotFather (exact name as provided by Telegram.org website Help)
+3. Open BotFather  bot
+4. Type   /newbot . You will get a mesage back from  the bot
+5. Type a name for your bot,  eg    hilton_bot. 
+6. It will get created by the BotFather bot and it will give you a token. Use this toke in the hilton-watcher.json file and replace where I mentioned "YOUR-TELEGRAM-TOKEN"
+7. Create a group eg: Hilton_Prices in Telegram app on your phone and add yourself and the Bot name, say hilton_bot, that you created in STEP-5
+8. in this new group , Hilton_Prices, just send a test message  hello . this is only to initiate the bot
+9. Not hit https://api.telegram.org/botYOUR-TELEGRAM-TOKEN/getUpdates . Make sure you have replaced the YOUR-TELEGRAM-TOKEN with the token that you got in STEP-6
+10. You will notice an id like "id":-SOME-NUMBER with the group name that you gave in STEP-7
+11. Replace Get-Bot-ID with this Chat ID in hilton-watcher.json file
+
+12. You can set other parameters in the hilton-watcher.json . The parameters are self expainatory. If case of any difficulty, please ping me back in Upwork. I explain the parameters. all the parameter and values are in double-quotes
+Date format is within double-quotes like  "YYYY-MM-DD"
+Price to Watch is within double-quotes like  "1,994,000"   or "799,000"
+I have created "check_future" paramter, which will only check future calendar months only if True,  else it will only check for the current calendar that appears based on the parameters in the URL
+
+Once you have Python installed on your machine or the Server that you want to use. ensure you have setup the environment wit hfollowing installations
+
+$ pip install selenium
+$ pip install telegram
+
+Use the Chrome Browser as it is at least faster than any other browser. Download the Chrome-Driver from https://chromedriver.chromium.org/downloads
+Before that just check the version of chrome that you are going to use. for eg if you have Chrome version 86.x.xx. , then download the ChromeDriver which says ChromeDriver 87.0.4280.88 on the Download page.
+
+
+Now you ar eready to run the Python script Script 
+
+$ python  hotels-com-watcher.py

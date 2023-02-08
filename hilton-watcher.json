@@ -1,0 +1,17 @@
+{
+  "base_url": "https://www.hilton.com/en/book/reservation/flexibledates/?ctyhocn={hotel_code}&arrivalDate={arrival_date}&departureDate={departure_date}&redeemPts={redeem_points}&room1NumAdults={num_of_adults}",
+  "interval": "5h",
+  "hotelspecs": {
+    "hotel_code": "MLEONWA",
+    "arrival_date": "2021-01-01",
+    "departure_date": "2021-01-15",
+    "check_future": "false",
+    "redeem_points": "true",
+    "num_of_adults": "2",
+    "price_to_watch": "1,994,000"
+  },
+  "telegram": {
+    "token": "1405897134:AAGmo2lfAcllW5mMs0B8AEs0CkgM-cSK2bo",
+    "bot_id": "1405897134"
+  }
+}
