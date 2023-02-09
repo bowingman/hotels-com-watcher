@@ -33,11 +33,9 @@ class HintonCalendar:
         self.sleep_time = ut.sleep_time_conversion(self.configs["interval"])
 
     def initialize_driver(self, host="localhost:8989"):
-        opt = Options()
-        opt.add_experimental_option('debuggerAddress', host)
-
-        self.driver = webdriver.Chrome(service=Service(
-            ChromeDriverManager().install()), options=opt)
+        
+        chromedriver = os.path.abspath('chrome\\chromedriver.exe')
+        self.driver = webdriver.Chrome(chromedriver)
 
         self.driver.set_window_size(1300, 1000)
         self.driver.implicitly_wait(10)
@@ -56,54 +54,6 @@ class HintonCalendar:
         self.driver.get(_base_url)
         time.sleep(10)
         print("Loaded Successfully!")
-
-    # def get_current_month_active_dates(self):
-    #     try:
-    #         flex_dates_visible = WebDriverWait(self.driver, 30).until(
-    #             EC.presence_of_element_located((By.XPATH, '//div[@data-e2e="flexDatesCalendarDay"]')))
-    #     except:
-    #         flex_dates_visible = None
-    #     if flex_dates_visible:
-    #         try:
-    #             active_dates_visible = self.driver.find_elements_by_xpath(
-    #                 '//div[@data-e2e="flexDatesCalendarDay" and not(contains(@class, "disabled"))]')
-    #         except:
-    #             active_dates_visible = []
-
-    #         current_month = self.driver.find_element_by_tag_name('header').text
-    #         current_month = current_month[:len(current_month) - 4].strip()
-
-    #         for adate in active_dates_visible:
-    #             button_text = adate.find_element_by_xpath('button').text
-    #             button_text = button_text.split('\n')
-    #             date_thru_txt = button_text[0]
-    #             date_thru_txt = date_thru_txt.replace('-', 'through')
-    #             room_rate_txt = button_text[1]
-    #             if room_rate_txt == self.hotel_specs["price_to_watch"]:
-    #                 self.active_dates.append(
-    #                     current_month + '@' + date_thru_txt)
-
-    # def gotoNextCalendar(self):
-    #     if self.hotel_specs["check_future"].lower() == 'true':
-    #         try:
-    #             next_button = self.driver.find_element_by_xpath(
-    #                 '//div[@class="hidden lg:block"]//button[@data-e2e="goToNextMonthButton" and not(@disabled)]')
-    #         except:
-    #             next_button = None
-
-    #         if next_button:
-    #             next_button.click()
-    #             return True
-    #         else:
-    #             return False
-    #     return False
-
-    # def gather_calendar_active_dates(self):
-    #     while True:
-    #         self.get_current_month_active_dates()
-    #         is_next_cal = self.gotoNextCalendar()
-    #         if not is_next_cal:
-    #             break
 
     def gather_active_rooms(self):
         res = {}
@@ -166,12 +116,14 @@ def send_content_to_email(email, results={}):
     print("SEND_EMAIL", results)
 
     try:
+        
+        gmail_configs = json.loads(open('config.json').read())
         # Gmail account credentials
-        username = "cadra.sag@gmail.com"
-        password = "999912141"
+        sender_email = gmail_configs["user_mail_address"]
+        password = gmail_configs["mail_app_key"]
 
         # Email recipient and message
-        to = email
+        receiver_email = email
         subject = "The results of Hotel Resarch"
         body = json.dumps(results)
 
@@ -179,16 +131,21 @@ def send_content_to_email(email, results={}):
         message = f"Subject: {subject}\n\n{body}"
 
         # Connect to the Gmail SMTP server and send the email
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.ehlo()
-        server.starttls()
-        server.login(username, password)
-        server.sendmail(username, to, message)
-        server.quit()
+        
+        try:
+            server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+            server.ehlo()
+            server.login(sender_email, password)
+            server.sendmail(sender_email, receiver_email, message)
+            server.close()
+
+            print('Email sent!')
+        except Exception as exception:
+            print("Error: %s!\n\n" % exception)
+
     except Exception as e:
         print(e)
 
-    print("SUCCESSFULLY SENT!")
     return True
 
 
@@ -196,8 +153,8 @@ def main():
     global watcher
 
     hotel_code = st.text_input('Hotel Code', 'MLEONWA')
-    arrival_date = st.text_input('Arrival Date', '2021-01-01')
-    departure_date = st.text_input('Departure Date', '2021-01-15')
+    arrival_date = st.text_input('Arrival Date', '2023-02-11')
+    departure_date = st.text_input('Departure Date', '2023-02-15')
     num_of_adults = st.number_input("Number of Adults", 1)
     price_of_watch = st.number_input("Price of Watch", 2000000, step=10000)
 
@@ -228,7 +185,7 @@ def main():
 
                 if status:
                     status = send_content_to_email(
-                        "gurut.sag@gmail.com", results)
+                        email, results)
                 st.write(results)
             except KeyboardInterrupt:
                 sys.exit(2)
