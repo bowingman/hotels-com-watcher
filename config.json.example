@@ -1,4 +1,10 @@
 {
     "user_mail_address": "example@gmail.com",
-    "mail_app_key": "your_api_key"
+    "mail_app_key": "your_api_key",
+    "hostname": "localhost:80",
+    "username": "root",
+    "password": "",
+    "database": "hotel-watch",
+    "base_url": "https://www.hilton.com/en/book/reservation/rooms/?ctyhocn={hotel_code}&arrivalDate={arrival_date}&departureDate={departure_date}&redeemPts={redeem_points}&room1NumAdults={num_of_adults}",
+    "interval": "5h"
 }

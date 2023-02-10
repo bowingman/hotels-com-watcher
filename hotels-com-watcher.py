@@ -3,6 +3,7 @@ import json
 import sys
 import time
 import smtplib
+import mysql.connector
 
 import streamlit as st
 from selenium import webdriver
@@ -20,6 +21,7 @@ import utility_box as ut
 
 chromedriver = None
 watcher = None
+configs = None
 
 
 class HintonCalendar:
@@ -32,8 +34,8 @@ class HintonCalendar:
         self.activate_rooms = []
         self.sleep_time = ut.sleep_time_conversion(self.configs["interval"])
 
-    def initialize_driver(self, host="localhost:8989"):
-        
+    def initialize_driver(self):
+
         chromedriver = os.path.abspath('chrome\\chromedriver.exe')
         self.driver = webdriver.Chrome(chromedriver)
 
@@ -63,7 +65,16 @@ class HintonCalendar:
                 By.CSS_SELECTOR, "[data-testid='noOfRoomsReturned']")
             rooms = room_parent.find_elements(By.XPATH, "./*")
 
-            res["room_count"] = len(rooms)
+            res["hotel_code"] = self.hotel_specs["hotel_code"]
+            res["arrival_date"] = self.hotel_specs["arrival_date"]
+            res["departure_date"] = self.hotel_specs["departure_date"]
+            res["redeem_points"] = self.hotel_specs["redeem_points"]
+            res["num_of_adults"] = self.hotel_specs["num_of_adults"]
+            res["price_of_watch"] = self.hotel_specs["price_of_watch"]
+            res["email"] = self.hotel_specs["email"]
+
+            res["total_room_count"] = len(rooms)
+            res["filtered_room_count"] = 0
             res["room_details"] = []
 
             for room_detail_element in rooms:
@@ -83,8 +94,13 @@ class HintonCalendar:
                     By.CSS_SELECTOR, "span[data-testid='quickBookPrice']").text
                 room_detail_info["MoreRatesPrice"] = room_detail_element.find_element(
                     By.CSS_SELECTOR, "button[data-testid='moreRatesButton']").text
+                room_detail_info["QuickBookPriceInt"] = int(
+                    room_detail_info["QuickBookPrice"].replace(",", "")[1:])
 
-                res["room_details"].append(room_detail_info)
+                if room_detail_info["QuickBookPriceInt"] < int(self.hotel_specs['price_of_watch']):
+                    res["room_details"].append(room_detail_info)
+
+            res["filtered_room_count"] = len(res["room_details"])
 
         except Exception as e:
             print(e)
@@ -97,7 +113,6 @@ class HintonCalendar:
         try:
             self.launch_calendar()
             result = self.gather_active_rooms()
-            # dt_table = ut.parse_active_dates(self.active_dates)
             ret_code = True
         except Exception as e:
             ret_code = False
@@ -107,20 +122,92 @@ class HintonCalendar:
         return ret_code, result
 
 
+def connect_mysql_database():
+
+    conn = mysql.connector.connect(
+        host=configs["hostname"],
+        user=configs["username"],
+        password=configs["password"],
+        database=configs["database"]
+    )
+
+    cursor = conn.cursor()
+    table_name = "hotel_watch_list"
+    cursor.execute("SHOW TABLES")
+    tables = cursor.fetchall()
+
+    tables = [table[0] for table in tables]
+    if table_name in tables:
+        print(f"Table {table_name} exists")
+    else:
+        print(f"Table {table_name} does not exist")
+        columns = "( \
+            id INT AUTO_INCREMENT PRIMARY KEY, \
+            hotel_code VARCHAR(255), \
+            arrival_date VARCHAR(255), \
+            departure_date VARCHAR(255), \
+            redeem_points VARCHAR(255), \
+            num_of_adults VARCHAR(255), \
+            price_of_watch VARCHAR(255), \
+            email VARCHAR(255), \
+            results TEXT \
+        )"
+        query = f"CREATE TABLE {table_name} {columns}"
+        cursor.execute(query)
+
+        conn.commit()
+    print("Successfully connected to the database!")
+
+    return conn, cursor
+
+
 def save_data(results):
+    print("SAVING DATA... \n")
+
+    conn, cursor = connect_mysql_database()
+    table_name = "hotel_watch_list"
+
+    values = "( \
+        hotel_code, \
+        arrival_date, \
+        departure_date, \
+        redeem_points, \
+        num_of_adults, \
+        price_of_watch, \
+        email, \
+        results \
+    )"
+    data = (
+        results["hotel_code"],
+        results["arrival_date"],
+        results["departure_date"],
+        results["redeem_points"],
+        results["num_of_adults"],
+        results["price_of_watch"],
+        results["email"],
+        json.dumps(results)
+    )
+    data_str = str(data).replace("(", "").replace(")", "")
+
+    query = f"INSERT INTO {table_name} {values} VALUES ({data_str})"
+
+    cursor.execute(query)
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
     return True
 
 
 def send_content_to_email(email, results={}):
 
-    print("SEND_EMAIL", results)
+    print("SENDING EMAIL...\n")
 
     try:
-        
-        gmail_configs = json.loads(open('config.json').read())
         # Gmail account credentials
-        sender_email = gmail_configs["user_mail_address"]
-        password = gmail_configs["mail_app_key"]
+        sender_email = configs["user_mail_address"]
+        password = configs["mail_app_key"]
 
         # Email recipient and message
         receiver_email = email
@@ -131,7 +218,7 @@ def send_content_to_email(email, results={}):
         message = f"Subject: {subject}\n\n{body}"
 
         # Connect to the Gmail SMTP server and send the email
-        
+
         try:
             server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
             server.ehlo()
@@ -151,21 +238,22 @@ def send_content_to_email(email, results={}):
 
 def main():
     global watcher
+    global configs
 
     hotel_code = st.text_input('Hotel Code', 'MLEONWA')
     arrival_date = st.text_input('Arrival Date', '2023-02-11')
     departure_date = st.text_input('Departure Date', '2023-02-15')
     num_of_adults = st.number_input("Number of Adults", 1)
-    price_of_watch = st.number_input("Price of Watch", 2000000, step=10000)
+    price_of_watch = st.number_input("Price of Watch", 300, step=100)
 
     email = st.text_input('Email Address', 'example@gmail.com')
     redeem_points = True
 
     if st.button('Submit'):
-        if not os.path.exists('hotel-watcher.json'):
-            st.write('hotel-watcher.json - Not Present !!!')
+        if not os.path.exists('config.json'):
+            st.write('config.json - Not Present !!!')
         else:
-            configs = json.loads(open('hotel-watcher.json').read())
+            configs = json.loads(open('config.json').read())
             watcher = HintonCalendar(configs, hotel_specs={
                 'hotel_code': hotel_code,
                 'arrival_date': arrival_date,
@@ -173,6 +261,7 @@ def main():
                 'num_of_adults': str(num_of_adults),
                 'price_of_watch': str(price_of_watch),
                 'redeem_points': str(redeem_points),
+                'email': email,
             })
 
             try:
@@ -183,9 +272,9 @@ def main():
                 if ret_code:
                     status = save_data(results)
 
-                if status:
-                    status = send_content_to_email(
-                        email, results)
+                # if status:
+                #     status = send_content_to_email(email, results)
+
                 st.write(results)
             except KeyboardInterrupt:
                 sys.exit(2)
