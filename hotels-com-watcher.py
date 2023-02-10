@@ -22,6 +22,7 @@ import utility_box as ut
 chromedriver = None
 watcher = None
 configs = None
+table_name = "hotel_watch_list"
 
 
 class HintonCalendar:
@@ -82,8 +83,11 @@ class HintonCalendar:
                 room_detail_info['RoomTypeName'] = room_detail_element.find_element(
                     By.CSS_SELECTOR, "span[data-testid='roomTypeName']").text
                 room_detail_info['SubInfo'] = []
-                room_sub_info = room_detail_element.find_element(
-                    By.TAG_NAME, "ul").find_elements(By.XPATH, "./*")
+                try:
+                    room_sub_info = room_detail_element.find_element(
+                        By.TAG_NAME, "ul").find_elements(By.XPATH, "./*")
+                except Exception as e:
+                    room_sub_info = []
 
                 for sub_info in room_sub_info:
                     room_detail_info['SubInfo'].append(sub_info.text)
@@ -132,7 +136,6 @@ def connect_mysql_database():
     )
 
     cursor = conn.cursor()
-    table_name = "hotel_watch_list"
     cursor.execute("SHOW TABLES")
     tables = cursor.fetchall()
 
@@ -150,7 +153,8 @@ def connect_mysql_database():
             num_of_adults VARCHAR(255), \
             price_of_watch VARCHAR(255), \
             email VARCHAR(255), \
-            results TEXT \
+            results TEXT, \
+            active BOOLEAN DEFAULT TRUE\
         )"
         query = f"CREATE TABLE {table_name} {columns}"
         cursor.execute(query)
@@ -161,11 +165,24 @@ def connect_mysql_database():
     return conn, cursor
 
 
+def get_active_filters():
+    conn, cursor = connect_mysql_database()
+    select_query = f"SELECT * FROM {table_name} WHERE active = True"
+
+    cursor.execute(select_query)
+    rows = cursor.fetchall()
+
+    for row in rows:
+        print(row)
+
+    cursor.close()
+    conn.close()
+
+
 def save_data(results):
     print("SAVING DATA... \n")
 
     conn, cursor = connect_mysql_database()
-    table_name = "hotel_watch_list"
 
     values = "( \
         hotel_code, \
@@ -175,7 +192,8 @@ def save_data(results):
         num_of_adults, \
         price_of_watch, \
         email, \
-        results \
+        results, \
+        active \
     )"
     data = (
         results["hotel_code"],
@@ -185,7 +203,8 @@ def save_data(results):
         results["num_of_adults"],
         results["price_of_watch"],
         results["email"],
-        json.dumps(results)
+        json.dumps(results),
+        True
     )
     data_str = str(data).replace("(", "").replace(")", "")
 
@@ -278,6 +297,7 @@ def main():
                 st.write(results)
             except KeyboardInterrupt:
                 sys.exit(2)
+    get_active_filters()
 
 
 if __name__ == '__main__':
