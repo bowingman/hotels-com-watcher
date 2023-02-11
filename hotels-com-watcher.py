@@ -14,15 +14,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.options import Options
-
-from webdriver_manager.chrome import ChromeDriverManager
-
-
 import utility_box as ut
 
 
-chromedriver = None
-watcher = None
 configs = None
 table_name = "hotel_watch_list"
 
@@ -35,7 +29,6 @@ class HintonCalendar:
         self.current_url = None
         self.driver = None
         self.hotel_specs = hotel_specs
-        self.activate_rooms = []
         self.sleep_time = ut.sleep_time_conversion(self.configs["interval"])
 
     def initialize_driver(self):
@@ -132,7 +125,6 @@ class HintonCalendar:
         return res
 
     def watch_calendar(self):
-        self.activate_rooms = []
         ret_code, result = False, {}
         try:
             self.launch_calendar()
@@ -210,6 +202,7 @@ def save_data(results):
     conn, cursor = connect_mysql_database()
 
     print("SAVING DATA... \n")
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     values = "( \
         hotel_code, \
@@ -221,7 +214,9 @@ def save_data(results):
         email, \
         url, \
         results, \
-        active \
+        active, \
+        created_at, \
+        updated_at \
     )"
     data = (
         results["hotel_code"],
@@ -233,11 +228,46 @@ def save_data(results):
         results["email"],
         results["url"],
         json.dumps(results),
-        True
+        True,
+        current_date,
+        current_date,
     )
+
     data_str = str(data).replace("(", "").replace(")", "")
 
     query = f"INSERT INTO {table_name} {values} VALUES ({data_str})"
+
+    cursor.execute(query)
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return True
+
+
+def update_data(id, results):
+    conn, cursor = connect_mysql_database()
+
+    print("UPDATING DATA... \n")
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    query = f"UPDATE {table_name} SET results = '{json.dumps(results)}', updated_at = '{current_date}' WHERE id = '{id}'"
+
+    cursor.execute(query)
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return True
+
+
+def delete_data(email):
+    conn, cursor = connect_mysql_database()
+
+    print("DELETING DATA... \n")
+    query = f"DELETE FROM {table_name} WHERE email = '{email}'"
 
     cursor.execute(query)
     conn.commit()
@@ -312,10 +342,34 @@ def set_env_settings():
     return True
 
 
+def handle_update_notification(email, results):
+    print('update clicked!')
+
+    delete_data(email)
+    update_data(results)
+    with st.sidebar:
+        st.success(
+            "Successfully updated the notification. From now on you will recieve the new contents of emails.")
+
+
+def handle_keep_notification():
+    print('keep clicked!')
+    with st.sidebar:
+        st.success("You didn't change the notification settings.")
+
+
+def handle_delete_notification(email):
+    print('delete clicked!')
+
+    delete_data(email)
+
+    with st.sidebar:
+        st.success("Successfully deleted the notification.")
+
+
 def main():
 
     email_notification_status = False
-    delete_notification_status, update_notification_status, keep_notification_status = False, False, False
 
     col1, col2 = st.columns(2)
 
@@ -334,12 +388,21 @@ def main():
         arrival_date = st.text_input('Arrival Date', '2023-02-11')
         departure_date = st.text_input('Departure Date', '2023-02-15')
         num_of_adults = st.number_input("Number of Adults", 1)
-        price_of_watch = st.number_input("Price of Watch", 300, step=100)
+        price_of_watch = st.number_input("Price of Watch", 6000, step=100)
 
         email = st.text_input('Email Address', 'example@gmail.com')
         redeem_points = True
 
         if st.button('Submit', disabled=not status, type="primary"):
+            date1 = datetime.strptime(arrival_date, "%Y-%m-%d")
+            date2 = datetime.strptime(departure_date, "%Y-%m-%d")
+
+            difference = date2 - date1
+
+            if difference.days > 15 or difference.days < 1:
+                st.error("Please select the correct date!")
+                return
+
             with col1:
                 col1.markdown("<h2>Previous Content: </h2>",
                               unsafe_allow_html=True)
@@ -354,8 +417,6 @@ def main():
 
                     else:
                         col1.write(json.loads(current_email_watch[0][9]))
-
-                    st.success('Done!')
 
             with col2:
                 col2.markdown("<h2>New Content: </h2>",
@@ -377,48 +438,60 @@ def main():
                     email_notification_status = True
                     if len(current_email_watch) == 0:
                         save_data(results)
-                    st.success('Done!')
 
         if email_notification_status:
             st.success(
                 f"We've successfully sent it to {email}. Please check your email box.")
-            st.info(
-                "Email notification have been already set before. Do you want to update it?")
 
-            bt1, bt2, bt3 = st.columns([2, 2, 7])
-            if bt1.button("Y", type="primary"):
-                print("Clicked Y")
-                delete_notification_status, update_notification_status, keep_notification_status = False, True, False
-                email_notification_status = False
+            if len(current_email_watch) != 0:
+                st.info(
+                    "Email notification have been already set before. Do you want to update it?")
 
-            if bt2.button("N", type="secondary"):
-                delete_notification_status, update_notification_status, keep_notification_status = False, False, True
-                email_notification_status = False
-
-            if bt3.button("DELETE NOTIFICATION", type="primary"):
-                delete_notification_status, update_notification_status, keep_notification_status = True, False, False
-                email_notification_status = False
-
-        if delete_notification_status:
-            st.success("Successfully deleted the notification.")
-
-        if update_notification_status:
-            st.success(
-                "Successfully updated the notification. From now on you will recieve the new contents of emails.")
-
-        if keep_notification_status:
-            st.success("You didn't change the notification settings.")
+                bt1, bt2, bt3 = st.columns([2, 2, 7])
+                bt1.button("Y", type="primary",
+                           on_click=handle_update_notification, args=(email, results, ))
+                bt2.button("N", type="secondary",
+                           on_click=handle_keep_notification)
+                bt3.button("DELETE NOTIFICATION", type="primary",
+                           on_click=handle_delete_notification, args=(email,))
 
 
 def watch_hotel_interval():
     print("watch_hotel_interval")
 
-    rows = get_watch_list()
+    while True:
+        time.sleep(1800)
 
-    for row in rows:
-        print(row[7])
-    # while True:
-    #     time.sleep(30)
+        rows = get_watch_list()
+
+        for row in rows:
+            ret_code, results = get_rooms(hotel_specs={
+                'hotel_code': row[1],
+                'arrival_date': row[2],
+                'departure_date': row[3],
+                'num_of_adults': str(row[5]),
+                'price_of_watch': str(row[6]),
+                'redeem_points': str(row[4]),
+                'email': row[7],
+            })
+
+            prev_results = json.loads(row[9])
+
+            if len(prev_results.room_details) == len(results.room_details):
+                for i in range(len(prev_results.room_details)):
+                    if prev_results.room_details[i]["RoomTypeName"] != results.room_details[i]["RoomTypeName"]:
+                        break
+
+            if i != len(prev_results.room_details) or len(prev_results.room_details) != len(results.room_details):
+                print("Diff", row[0])
+                send_content_to_email(row[7], results)
+                update_data(int(row[0]), results)
+                print("Successfully Updated")
+
+            else:
+                print("Same", row[0])
+
+        print("Successfully finished interval")
 
 
 if __name__ == '__main__':
@@ -443,10 +516,8 @@ if __name__ == '__main__':
             "Config.js Not a Present! You can't use this app. Please check your config.js")
         exit(0)
 
-    watch_hotel_interval()
-
-    # if not is_thread:
-    #     thread = threading.Thread(target=watch_hotel_interval)
-    #     thread.start()
+    if not is_thread:
+        thread = threading.Thread(target=watch_hotel_interval)
+        thread.start()
 
     main()
