@@ -14,7 +14,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.options import Options
-import utility_box as ut
 
 
 configs = None
@@ -29,7 +28,6 @@ class HintonCalendar:
         self.current_url = None
         self.driver = None
         self.hotel_specs = hotel_specs
-        self.sleep_time = ut.sleep_time_conversion(self.configs["interval"])
 
     def initialize_driver(self):
 
@@ -477,12 +475,12 @@ def watch_hotel_interval():
 
             prev_results = json.loads(row[9])
 
-            if len(prev_results.room_details) == len(results.room_details):
-                for i in range(len(prev_results.room_details)):
-                    if prev_results.room_details[i]["RoomTypeName"] != results.room_details[i]["RoomTypeName"]:
+            if prev_results["filtered_room_count"] == results["filtered_room_count"]:
+                for i in range(prev_results["filtered_room_count"]):
+                    if prev_results["room_details"][i]["RoomTypeName"] != results["room_details"][i]["RoomTypeName"]:
                         break
 
-            if i != len(prev_results.room_details) or len(prev_results.room_details) != len(results.room_details):
+            if prev_results["filtered_room_count"] != results["filtered_room_count"] or i != len(prev_results["room_details"]) - 1:
                 print("Diff", row[0])
                 send_content_to_email(row[7], results)
                 update_data(int(row[0]), results)
