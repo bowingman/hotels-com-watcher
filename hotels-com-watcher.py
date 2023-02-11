@@ -1,3 +1,4 @@
+import threading
 import os
 import json
 import sys
@@ -6,6 +7,7 @@ import smtplib
 import mysql.connector
 
 import streamlit as st
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -30,6 +32,7 @@ class HintonCalendar:
     def __init__(self, configs, hotel_specs):
         self.configs = configs
         self.base_url = self.configs["base_url"]
+        self.current_url = None
         self.driver = None
         self.hotel_specs = hotel_specs
         self.activate_rooms = []
@@ -54,6 +57,7 @@ class HintonCalendar:
             '{redeem_points}', self.hotel_specs["redeem_points"])
         _base_url = _base_url.replace(
             '{num_of_adults}', self.hotel_specs["num_of_adults"])
+        self.current_url = _base_url
         self.driver.get(_base_url)
         time.sleep(10)
         print("Loaded Successfully!")
@@ -73,6 +77,7 @@ class HintonCalendar:
             res["num_of_adults"] = self.hotel_specs["num_of_adults"]
             res["price_of_watch"] = self.hotel_specs["price_of_watch"]
             res["email"] = self.hotel_specs["email"]
+            res["url"] = self.current_url
 
             res["total_room_count"] = len(rooms)
             res["filtered_room_count"] = 0
@@ -92,14 +97,29 @@ class HintonCalendar:
                 for sub_info in room_sub_info:
                     room_detail_info['SubInfo'].append(sub_info.text)
 
-                room_detail_info["PayWithPoint"] = room_detail_element.find_element(
-                    By.CSS_SELECTOR, "div[data-testid='pamNotLoggedInMessage']").text
-                room_detail_info["QuickBookPrice"] = room_detail_element.find_element(
-                    By.CSS_SELECTOR, "span[data-testid='quickBookPrice']").text
-                room_detail_info["MoreRatesPrice"] = room_detail_element.find_element(
-                    By.CSS_SELECTOR, "button[data-testid='moreRatesButton']").text
-                room_detail_info["QuickBookPriceInt"] = int(
-                    room_detail_info["QuickBookPrice"].replace(",", "")[1:])
+                try:
+                    room_detail_info["PayWithPoint"] = room_detail_element.find_element(
+                        By.CSS_SELECTOR, "div[data-testid='pamNotLoggedInMessage']").text
+                except Exception as e:
+                    print(e)
+                    room_detail_info["PayWithPoint"] = None
+
+                try:
+                    room_detail_info["QuickBookPrice"] = room_detail_element.find_element(
+                        By.CSS_SELECTOR, "span[data-testid='quickBookPrice']").text
+                    room_detail_info["QuickBookPriceInt"] = int(
+                        room_detail_info["QuickBookPrice"].replace(",", "")[1:])
+                except Exception as e:
+                    print(e)
+                    room_detail_info["QuickBookPrice"] = None
+                    room_detail_info["QuickBookPriceInt"] = 0
+
+                try:
+                    room_detail_info["MoreRatesPrice"] = room_detail_element.find_element(
+                        By.CSS_SELECTOR, "button[data-testid='moreRatesButton']").text
+                except Exception as e:
+                    print(e)
+                    room_detail_info["MoreRatesPrice"] = None
 
                 if room_detail_info["QuickBookPriceInt"] < int(self.hotel_specs['price_of_watch']):
                     res["room_details"].append(room_detail_info)
@@ -144,7 +164,9 @@ def connect_mysql_database():
         print(f"Table {table_name} exists")
     else:
         print(f"Table {table_name} does not exist")
-        columns = "( \
+
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        columns = f"( \
             id INT AUTO_INCREMENT PRIMARY KEY, \
             hotel_code VARCHAR(255), \
             arrival_date VARCHAR(255), \
@@ -153,36 +175,41 @@ def connect_mysql_database():
             num_of_adults VARCHAR(255), \
             price_of_watch VARCHAR(255), \
             email VARCHAR(255), \
+            url TEXT, \
             results TEXT, \
-            active BOOLEAN DEFAULT TRUE\
+            active BOOLEAN DEFAULT TRUE, \
+            created_at DATETIME DEFAULT '{current_date}', \
+            updated_at DATETIME DEFAULT '{current_date}' \
         )"
         query = f"CREATE TABLE {table_name} {columns}"
         cursor.execute(query)
 
         conn.commit()
+        print("Successfully connected to the table!")
+
     print("Successfully connected to the database!")
 
     return conn, cursor
 
 
-def get_active_filters():
+def get_watch_list():
     conn, cursor = connect_mysql_database()
+
     select_query = f"SELECT * FROM {table_name} WHERE active = True"
 
     cursor.execute(select_query)
     rows = cursor.fetchall()
 
-    for row in rows:
-        print(row)
-
     cursor.close()
     conn.close()
 
+    return rows
+
 
 def save_data(results):
-    print("SAVING DATA... \n")
-
     conn, cursor = connect_mysql_database()
+
+    print("SAVING DATA... \n")
 
     values = "( \
         hotel_code, \
@@ -192,6 +219,7 @@ def save_data(results):
         num_of_adults, \
         price_of_watch, \
         email, \
+        url, \
         results, \
         active \
     )"
@@ -203,6 +231,7 @@ def save_data(results):
         results["num_of_adults"],
         results["price_of_watch"],
         results["email"],
+        results["url"],
         json.dumps(results),
         True
     )
@@ -255,50 +284,169 @@ def send_content_to_email(email, results={}):
     return True
 
 
-def main():
-    global watcher
+def get_rooms(hotel_specs):
+    watcher = HintonCalendar(configs, hotel_specs)
+
+    if not watcher.driver:
+        watcher.initialize_driver()
+    ret_code, results = watcher.watch_calendar()
+
+    if ret_code:
+        return True, results
+    return False, None
+    status = save_data(results)
+
+    if status:
+        status = send_content_to_email(hotel_specs['email'], results)
+
+    return True
+
+
+def set_env_settings():
     global configs
 
-    hotel_code = st.text_input('Hotel Code', 'MLEONWA')
-    arrival_date = st.text_input('Arrival Date', '2023-02-11')
-    departure_date = st.text_input('Departure Date', '2023-02-15')
-    num_of_adults = st.number_input("Number of Adults", 1)
-    price_of_watch = st.number_input("Price of Watch", 300, step=100)
+    if not os.path.exists('config.json'):
+        return False
+    else:
+        configs = json.loads(open('config.json').read())
+    return True
 
-    email = st.text_input('Email Address', 'example@gmail.com')
-    redeem_points = True
 
-    if st.button('Submit'):
-        if not os.path.exists('config.json'):
-            st.write('config.json - Not Present !!!')
-        else:
-            configs = json.loads(open('config.json').read())
-            watcher = HintonCalendar(configs, hotel_specs={
-                'hotel_code': hotel_code,
-                'arrival_date': arrival_date,
-                'departure_date': departure_date,
-                'num_of_adults': str(num_of_adults),
-                'price_of_watch': str(price_of_watch),
-                'redeem_points': str(redeem_points),
-                'email': email,
-            })
+def main():
 
-            try:
-                if not watcher.driver:
-                    watcher.initialize_driver()
-                ret_code, results = watcher.watch_calendar()
+    email_notification_status = False
+    delete_notification_status, update_notification_status, keep_notification_status = False, False, False
 
-                if ret_code:
-                    status = save_data(results)
+    col1, col2 = st.columns(2)
 
-                # if status:
-                #     status = send_content_to_email(email, results)
+    st.markdown(
+        """ <style>
+                .css-163ttbj {
+                    background-color: khaki;
+                }
+            </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-                st.write(results)
-            except KeyboardInterrupt:
-                sys.exit(2)
-    get_active_filters()
+    with st.sidebar:
+        hotel_code = st.text_input('Hotel Code', 'MLEONWA')
+        arrival_date = st.text_input('Arrival Date', '2023-02-11')
+        departure_date = st.text_input('Departure Date', '2023-02-15')
+        num_of_adults = st.number_input("Number of Adults", 1)
+        price_of_watch = st.number_input("Price of Watch", 300, step=100)
+
+        email = st.text_input('Email Address', 'example@gmail.com')
+        redeem_points = True
+
+        if st.button('Submit', disabled=not status, type="primary"):
+            with col1:
+                col1.markdown("<h2>Previous Content: </h2>",
+                              unsafe_allow_html=True)
+                with st.spinner("Wait for it..."):
+                    rows = get_watch_list()
+
+                    current_email_watch = [
+                        row for row in rows if row[7] == email]
+
+                    if len(current_email_watch) == 0:
+                        col1.text("No Previous Content!")
+
+                    else:
+                        col1.write(json.loads(current_email_watch[0][9]))
+
+                    st.success('Done!')
+
+            with col2:
+                col2.markdown("<h2>New Content: </h2>",
+                              unsafe_allow_html=True)
+                with st.spinner("Wait for it..."):
+
+                    ret_code, results = get_rooms(hotel_specs={
+                        'hotel_code': hotel_code,
+                        'arrival_date': arrival_date,
+                        'departure_date': departure_date,
+                        'num_of_adults': str(num_of_adults),
+                        'price_of_watch': str(price_of_watch),
+                        'redeem_points': str(redeem_points),
+                        'email': email,
+                    })
+
+                    send_content_to_email(email, results)
+                    col2.write(results)
+                    email_notification_status = True
+                    if len(current_email_watch) == 0:
+                        save_data(results)
+                    st.success('Done!')
+
+        if email_notification_status:
+            st.success(
+                f"We've successfully sent it to {email}. Please check your email box.")
+            st.info(
+                "Email notification have been already set before. Do you want to update it?")
+
+            bt1, bt2, bt3 = st.columns([2, 2, 7])
+            if bt1.button("Y", type="primary"):
+                print("Clicked Y")
+                delete_notification_status, update_notification_status, keep_notification_status = False, True, False
+                email_notification_status = False
+
+            if bt2.button("N", type="secondary"):
+                delete_notification_status, update_notification_status, keep_notification_status = False, False, True
+                email_notification_status = False
+
+            if bt3.button("DELETE NOTIFICATION", type="primary"):
+                delete_notification_status, update_notification_status, keep_notification_status = True, False, False
+                email_notification_status = False
+
+        if delete_notification_status:
+            st.success("Successfully deleted the notification.")
+
+        if update_notification_status:
+            st.success(
+                "Successfully updated the notification. From now on you will recieve the new contents of emails.")
+
+        if keep_notification_status:
+            st.success("You didn't change the notification settings.")
+
+
+def watch_hotel_interval():
+    print("watch_hotel_interval")
+
+    rows = get_watch_list()
+
+    for row in rows:
+        print(row[7])
+    # while True:
+    #     time.sleep(30)
 
 
 if __name__ == '__main__':
+    print("__main__")
+
+    is_thread = False
+    running_threads = enumerate(list(threading.enumerate()))
+
+    for i, thread in running_threads:
+        if "watch_hotel_interval" in thread.name:
+            print("Already interval exists")
+            is_thread = True
+        print("Thread {}: {}".format(i, thread.name))
+
+    print("Started Main")
+
+    st.set_page_config(layout="wide")
+    status = set_env_settings()
+
+    if not status:
+        st.error(
+            "Config.js Not a Present! You can't use this app. Please check your config.js")
+        exit(0)
+
+    watch_hotel_interval()
+
+    # if not is_thread:
+    #     thread = threading.Thread(target=watch_hotel_interval)
+    #     thread.start()
+
     main()
