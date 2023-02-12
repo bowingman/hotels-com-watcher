@@ -246,13 +246,13 @@ def save_data(results):
     return True
 
 
-def update_data(id, results):
+def update_data(id, colname, results):
     conn, cursor = connect_mysql_database()
 
     print("UPDATING DATA... \n")
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    query = f"UPDATE {table_name} SET results = '{json.dumps(results)}', updated_at = '{current_date}' WHERE id = '{id}'"
+    query = f"UPDATE {table_name} SET {colname} = '{json.dumps(results)}', updated_at = '{current_date}' WHERE id = '{id}'"
 
     cursor.execute(query)
     conn.commit()
@@ -489,10 +489,12 @@ def main():
         if st.button('Submit', disabled=not status, type="primary"):
             date1 = datetime.strptime(arrival_date, "%Y-%m-%d")
             date2 = datetime.strptime(departure_date, "%Y-%m-%d")
+            current_date = datetime.now()
 
-            difference = date2 - date1
+            difference1 = date2 - date1
+            difference2 = date1 - current_date
 
-            if difference.days > 8 or difference.days < 1:
+            if difference1.days > 13 or difference1.days < 1 or difference2.days < 1:
                 st.error("Please select the correct date!")
                 return
 
@@ -558,6 +560,19 @@ def watch_hotel_interval():
         rows = get_watch_list()
 
         for row in rows:
+            prev_results = json.loads(row[9])
+            current_date = datetime.now()
+
+            print('here', prev_results)
+
+            diff = datetime.strptime(
+                prev_results["arrival_date"], "%Y-%m-%d") - current_date
+
+            if diff.days < 2:
+                update_data(int(row[0]), "active", False)
+                print(int(row[0]), ": Expired")
+                continue
+
             ret_code, results = get_rooms(hotel_specs={
                 'hotel_code': row[1],
                 'arrival_date': row[2],
@@ -568,8 +583,6 @@ def watch_hotel_interval():
                 'email': row[7],
             })
 
-            prev_results = json.loads(row[9])
-
             if prev_results["filtered_room_count"] == results["filtered_room_count"]:
                 for i in range(prev_results["filtered_room_count"]):
                     if prev_results["room_details"][i]["RoomTypeName"] != results["room_details"][i]["RoomTypeName"]:
@@ -578,7 +591,7 @@ def watch_hotel_interval():
             if prev_results["filtered_room_count"] != results["filtered_room_count"] or i != len(prev_results["room_details"]) - 1:
                 print("Diff", row[0])
                 send_content_to_email(row[7], results)
-                update_data(int(row[0]), results)
+                update_data(int(row[0]), "results", results)
                 print("Successfully Updated")
 
             else:
