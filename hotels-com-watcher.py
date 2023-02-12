@@ -15,6 +15,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 
+from email.mime.text import MIMEText
+
 
 configs = None
 table_name = "hotel_watch_list"
@@ -351,8 +353,8 @@ def generate_email_body(results):
     for room in results["room_details"]:
 
         room_details += """
-            <div class = "room-type" > {RoomTypeName} < /div >
-            <div class = "room-info" > {SubInfo} < /div >
+            <div class = "room-type" > {RoomTypeName} </div>
+            <div class = "room-info" > {SubInfo} </div>
             <div class = "room-price" >
                 Quick Book Price: {QuickBookPrice}
                 <br > Pay with Points: {PayWithPoint}
@@ -383,8 +385,14 @@ def send_content_to_email(email, results={}):
         subject = "The results of Hotel Resarch"
         body = generate_email_body(results)
 
-        # Compose the email message
-        message = f"Subject: {subject}\n\n{body}"
+        # Compose the email message 
+        message = """From: You <{sender_email}>
+To: Recipient <{receiver_email}>
+Subject: The results of Hotel Resarch
+MIME-Version: 1.0
+Content-type: text/html
+{body}
+""".format(sender_email = sender_email, receiver_email = receiver_email, body=body)
 
         # Connect to the Gmail SMTP server and send the email
 
