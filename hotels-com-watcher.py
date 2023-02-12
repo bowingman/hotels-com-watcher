@@ -276,6 +276,99 @@ def delete_data(email):
     return True
 
 
+def generate_email_body(results):
+    result = """
+        <html>
+            <head>
+                <style>
+                .hotel-info {
+                    width: 60%;
+                    margin: 0 auto;
+                    text-align: center;
+                }
+
+                .hotel-info h1 {
+                    font-size: 36px;
+                    margin-bottom: 20px;
+                }
+
+                .hotel-info p {
+                    font-size: 18px;
+                    margin-bottom: 10px;
+                }
+
+                .room-details {
+                    width: 100%;
+                    margin: 40px 0;
+                    text-align: left;
+                }
+
+                .room-details h2 {
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                }
+
+                .room-details .room-type {
+                    font-size: 18px;
+                    margin-bottom: 10px;
+                }
+
+                .room-details .room-info {
+                    font-size: 14px;
+                    margin-bottom: 20px;
+                }
+
+                .room-details .room-price {
+                    font-size: 18px;
+                    margin-bottom: 20px;
+                }
+                </style>
+            </head>
+            <body>
+                <div class="hotel-info">
+                <h1>{hotel_code}</h1>
+                <p>Arrival Date: {arrival_date}</p>
+                <p>Departure Date: {departure_date}</p>
+                <p>Redeem Points: {redeem_points}</p>
+                <p>Number of Adults: {num_of_adults}</p>
+                <p>Price of Watch: {price_of_watch}</p>
+                </div>
+                <div class="room-details">
+                <h2>Room Details</h2>
+                %ROOM_DETAILS%
+                </div>
+            </body>
+        </html>
+    """.format(
+        hotel_code=results["hotel_code"],
+        arrival_date=results["arrival_date"],
+        num_of_adults=results["num_of_adults"],
+        price_of_watch=results["price_of_watch"]
+    )
+
+    room_details = ""
+
+    for room in results["room_details"]:
+
+        room_details += """
+            <div class="room-type">{RoomTypeName}</div>
+            <div class="room-info">{SubInfo}</div>
+            <div class="room-price">
+                Quick Book Price: {QuickBookPrice}
+                <br>Pay with Points: {PayWithPoint}
+            </div>
+        """.format(
+            RoomTypeName=room["RoomTypeName"],
+            SubInfo=room["SubInfo"],
+            QuickBookPrice=room["QuickBookPrice"],
+            PayWithPoint=room["PayWithPoint"],
+        )
+
+    results = results.replace("%ROOM_DETAILS%", room_details)
+
+    return results
+
+
 def send_content_to_email(email, results={}):
 
     print("SENDING EMAIL...\n")
@@ -288,7 +381,7 @@ def send_content_to_email(email, results={}):
         # Email recipient and message
         receiver_email = email
         subject = "The results of Hotel Resarch"
-        body = json.dumps(results)
+        body = generate_email_body(results)
 
         # Compose the email message
         message = f"Subject: {subject}\n\n{body}"
@@ -322,12 +415,6 @@ def get_rooms(hotel_specs):
     if ret_code:
         return True, results
     return False, None
-    status = save_data(results)
-
-    if status:
-        status = send_content_to_email(hotel_specs['email'], results)
-
-    return True
 
 
 def set_env_settings():
