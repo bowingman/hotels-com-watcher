@@ -277,8 +277,7 @@ def delete_data(email):
 
 
 def generate_email_body(results):
-    result = """
-        <html>
+    resultheader = """<html>
             <head>
                 <style>
                 .hotel-info {
@@ -323,13 +322,13 @@ def generate_email_body(results):
                     margin-bottom: 20px;
                 }
                 </style>
-            </head>
+            </head>"""
+    resultbody = """    
             <body>
                 <div class="hotel-info">
                 <h1>{hotel_code}</h1>
                 <p>Arrival Date: {arrival_date}</p>
                 <p>Departure Date: {departure_date}</p>
-                <p>Redeem Points: {redeem_points}</p>
                 <p>Number of Adults: {num_of_adults}</p>
                 <p>Price of Watch: {price_of_watch}</p>
                 </div>
@@ -342,6 +341,7 @@ def generate_email_body(results):
     """.format(
         hotel_code=results["hotel_code"],
         arrival_date=results["arrival_date"],
+        departure_date=results["departure_date"],
         num_of_adults=results["num_of_adults"],
         price_of_watch=results["price_of_watch"]
     )
@@ -351,12 +351,12 @@ def generate_email_body(results):
     for room in results["room_details"]:
 
         room_details += """
-            <div class="room-type">{RoomTypeName}</div>
-            <div class="room-info">{SubInfo}</div>
-            <div class="room-price">
+            <div class = "room-type" > {RoomTypeName} < /div >
+            <div class = "room-info" > {SubInfo} < /div >
+            <div class = "room-price" >
                 Quick Book Price: {QuickBookPrice}
-                <br>Pay with Points: {PayWithPoint}
-            </div>
+                <br > Pay with Points: {PayWithPoint}
+            </div >
         """.format(
             RoomTypeName=room["RoomTypeName"],
             SubInfo=room["SubInfo"],
@@ -364,9 +364,9 @@ def generate_email_body(results):
             PayWithPoint=room["PayWithPoint"],
         )
 
-    results = results.replace("%ROOM_DETAILS%", room_details)
+    resultbody = resultbody.replace("%ROOM_DETAILS%", room_details)
 
-    return results
+    return resultheader + resultbody
 
 
 def send_content_to_email(email, results={}):
