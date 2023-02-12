@@ -1,7 +1,7 @@
 {
     "user_mail_address": "example@gmail.com",
     "mail_app_key": "your_api_key",
-    "hostname": "localhost:80",
+    "hostname": "localhost",
     "username": "root",
     "password": "",
     "database": "hotel-watch",
