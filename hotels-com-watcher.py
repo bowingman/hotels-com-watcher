@@ -385,14 +385,14 @@ def send_content_to_email(email, results={}):
         subject = "The results of Hotel Resarch"
         body = generate_email_body(results)
 
-        # Compose the email message 
+        # Compose the email message
         message = """From: You <{sender_email}>
 To: Recipient <{receiver_email}>
 Subject: The results of Hotel Resarch
 MIME-Version: 1.0
 Content-type: text/html
 {body}
-""".format(sender_email = sender_email, receiver_email = receiver_email, body=body)
+""".format(sender_email=sender_email, receiver_email=receiver_email, body=body)
 
         # Connect to the Gmail SMTP server and send the email
 
@@ -492,7 +492,7 @@ def main():
 
             difference = date2 - date1
 
-            if difference.days > 15 or difference.days < 1:
+            if difference.days > 8 or difference.days < 1:
                 st.error("Please select the correct date!")
                 return
 
