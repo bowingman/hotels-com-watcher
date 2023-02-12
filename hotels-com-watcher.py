@@ -439,7 +439,7 @@ def handle_update_notification(email, results):
     print('update clicked!')
 
     delete_data(email)
-    update_data(results)
+    save_data(results)
     with st.sidebar:
         st.success(
             "Successfully updated the notification. From now on you will recieve the new contents of emails.")
