@@ -135,6 +135,7 @@ class HintonCalendar:
         ret_code, result, total_result = False, {}, {**self.hotel_specs}
 
         total_result["rooms_by_date"] = []
+        total_result["filtered_room_count"] = 0
 
         for i in range(self.hotel_specs['total_nights']):
             self.exc_start_date = self.arrival_date + timedelta(days=i)
@@ -153,6 +154,7 @@ class HintonCalendar:
                 ret_code = False
             if ret_code:
                 total_result["rooms_by_date"].append(result)
+                total_result["filtered_room_count"] += result["filtered_room_count"]
 
         self.driver.quit()
         self.driver = None
@@ -187,8 +189,9 @@ def connect_mysql_database():
             redeem_points VARCHAR(255), \
             num_of_adults VARCHAR(255), \
             price_of_watch VARCHAR(255), \
+            nights VARCHAR(255), \
+            total_nights VARCHAR(255), \
             email VARCHAR(255), \
-            url TEXT, \
             results TEXT, \
             active BOOLEAN DEFAULT TRUE, \
             created_at DATETIME DEFAULT '{current_date}', \
@@ -232,8 +235,9 @@ def save_data(results):
         redeem_points, \
         num_of_adults, \
         price_of_watch, \
+        nights, \
+        total_nights, \
         email, \
-        url, \
         results, \
         active, \
         created_at, \
@@ -246,8 +250,9 @@ def save_data(results):
         results["redeem_points"],
         results["num_of_adults"],
         results["price_of_watch"],
+        results["nights"],
+        results["total_nights"],
         results["email"],
-        results["url"],
         json.dumps(results),
         True,
         current_date,
@@ -301,91 +306,132 @@ def delete_data(email):
 
 def generate_email_body(results):
     resultheader = """<html>
-            <head>
-                <style>
-                .hotel-info {
-                    width: 60%;
-                    margin: 0 auto;
-                    text-align: center;
-                }
+<head>
+    <style>
+        .hotel-info {
+            width: 60%;
+            margin: 0 auto;
+            text-align: center;
+        }
 
-                .hotel-info h1 {
-                    font-size: 36px;
-                    margin-bottom: 20px;
-                }
+        .hotel-info h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
 
-                .hotel-info p {
-                    font-size: 18px;
-                    margin-bottom: 10px;
-                }
+        .hotel-info p {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
 
-                .room-details {
-                    width: 100%;
-                    margin: 40px 0;
-                    text-align: left;
-                }
+        .room-details {
+            width: 100%;
+            margin: 40px 0;
+            text-align: left;
+        }
 
-                .room-details h2 {
-                    font-size: 24px;
-                    margin-bottom: 20px;
-                }
+        .room-details h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
 
-                .room-details .room-type {
-                    font-size: 18px;
-                    margin-bottom: 10px;
-                }
+        .room-details .room-type {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
 
-                .room-details .room-info {
-                    font-size: 14px;
-                    margin-bottom: 20px;
-                }
+        .room-details .room-info {
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
 
-                .room-details .room-price {
-                    font-size: 18px;
-                    margin-bottom: 20px;
-                }
-                </style>
-            </head>"""
-    resultbody = """    
-            <body>
-                <div class="hotel-info">
-                <h1>{hotel_code}</h1>
-                <p>Arrival Date: {arrival_date}</p>
-                <p>Departure Date: {departure_date}</p>
-                <p>Number of Adults: {num_of_adults}</p>
-                <p>Price of Watch: {price_of_watch}</p>
-                </div>
-                <div class="room-details">
-                <h2>Room Details</h2>
-                %ROOM_DETAILS%
-                </div>
-            </body>
-        </html>
+        .room-details .room-price {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .text-lg {
+            font-size: 20px;
+        }
+
+        .mt-3 {
+            margin-top: 20px;
+        }
+    </style>
+</head>"""
+    resultbody = """
+<body>
+    <div class="general-info">
+        <div class="hotel-info">
+            <h1>{hotel_code}</h1>
+            <p>Arrival Date: {arrival_date}</p>
+            <p>Departure Date: {departure_date}</p>
+            <p>Number of Adults: {num_of_adults}</p>
+            <p>Price of Watch: {price_of_watch}</p>
+            <p>Nights: {nights}</p>
+        </div>
+    </div>
+    <div class="room-details">
+        <h2>Room Details</h2>
+    </div>
+    <div class="details">
+        <ul>
+%ROOM_DETAILS%
+        </ul>
+    </div>
+</body>
+</html>
     """.format(
         hotel_code=results["hotel_code"],
         arrival_date=results["arrival_date"],
         departure_date=results["departure_date"],
         num_of_adults=results["num_of_adults"],
-        price_of_watch=results["price_of_watch"]
+        price_of_watch=results["price_of_watch"],
+        nights=results["nights"]
     )
 
     room_details = ""
+    if len(room["SubInfo"]) > 0:
+        sub_info = room["SubInfo"]
+    else:
+        sub_info = ' '
 
-    for room in results["room_details"]:
-
+    for items in results["rooms_by_date"]:
         room_details += """
-            <div class = "room-type" > {RoomTypeName} </div>
-            <div class = "room-info" > {SubInfo} </div>
-            <div class = "room-price" >
-                Quick Book Price: {QuickBookPrice}
-                <br > Pay with Points: {PayWithPoint}
-            </div >
+        <li class="mt-3">
+            <div class="details-header">
+                <div class="text-lg"><strong>{date_from} ~ {date_to} </strong></div>
+                <div>total rooms: <strong>{total_rooms}</strong></div>
+                <div>filtered count: <strong>{filtered_count}</strong></div>
+            <div>
         """.format(
-            RoomTypeName=room["RoomTypeName"],
-            SubInfo=room["SubInfo"],
-            QuickBookPrice=room["QuickBookPrice"],
-            PayWithPoint=room["PayWithPoint"],
+            date_from=items["from"],
+            date_to=items["to"],
+            total_rooms=items["total_room_count"],
+            filtered_count=items["filtered_room_count"]
         )
+        sub_room_details = """<div class='details-body'>
+                    <ul>
+            """
+        for room in items["room_details"]:
+
+            sub_room_details += """
+            <li>
+                <div class = "room-type"> {RoomTypeName} </div>
+                <div class = "room-info"> {SubInfo} </div>
+                <div class = "room-price">
+                    Quick Book Price: {QuickBookPrice}
+                    <br> {PayWithPoint}
+                </div>
+            </li>
+            """.format(
+                RoomTypeName=room["RoomTypeName"],
+                SubInfo=sub_info,
+                QuickBookPrice=room["QuickBookPrice"],
+                PayWithPoint=room["PayWithPoint"],
+            )
+        sub_room_details += "</ul></div>"
+        room_details += sub_room_details + "</li>"
 
     resultbody = resultbody.replace("%ROOM_DETAILS%", room_details)
 
@@ -534,13 +580,13 @@ def main():
                     rows = get_watch_list()
 
                     current_email_watch = [
-                        row for row in rows if row[7] == email]
+                        row for row in rows if row[9] == email]
 
                     if len(current_email_watch) == 0:
                         col1.text("No Previous Content!")
 
                     else:
-                        col1.write(json.loads(current_email_watch[0][9]))
+                        col1.write(json.loads(current_email_watch[0][10]))
 
             with col2:
                 col2.markdown("<h2>New Content: </h2>",
@@ -559,11 +605,11 @@ def main():
                         'email': email,
                     })
 
-                    # send_content_to_email(email, results)
+                    send_content_to_email(email, results)
                     col2.write(results)
-                    # email_notification_status = True
-                    # if len(current_email_watch) == 0:
-                    # save_data(results)
+                    email_notification_status = True
+                    if len(current_email_watch) == 0:
+                        save_data(results)
 
         if email_notification_status:
             st.success(
@@ -586,12 +632,12 @@ def watch_hotel_interval():
     print("watch_hotel_interval")
 
     while True:
-        time.sleep(1800)
+        time.sleep(21600)
 
         rows = get_watch_list()
 
         for row in rows:
-            prev_results = json.loads(row[9])
+            prev_results = json.loads(row[10])
             current_date = datetime.now()
 
             print('here', prev_results)
@@ -611,17 +657,14 @@ def watch_hotel_interval():
                 'num_of_adults': str(row[5]),
                 'price_of_watch': str(row[6]),
                 'redeem_points': str(row[4]),
-                'email': row[7],
+                'nights': int(row[7]),
+                'total_nights': int(row[8]),
+                'email': row[9],
             })
 
-            if prev_results["filtered_room_count"] == results["filtered_room_count"]:
-                for i in range(prev_results["filtered_room_count"]):
-                    if prev_results["room_details"][i]["RoomTypeName"] != results["room_details"][i]["RoomTypeName"]:
-                        break
-
-            if prev_results["filtered_room_count"] != results["filtered_room_count"] or i != len(prev_results["room_details"]) - 1:
+            if prev_results["filtered_room_count"] != results["filtered_room_count"]:
                 print("Diff", row[0])
-                send_content_to_email(row[7], results)
+                send_content_to_email(row[9], results)
                 update_data(int(row[0]), "results", results)
                 print("Successfully Updated")
 
@@ -637,24 +680,24 @@ if __name__ == '__main__':
     is_thread = False
     running_threads = enumerate(list(threading.enumerate()))
 
-    # for i, thread in running_threads:
-    #     if "watch_hotel_interval" in thread.name:
-    #         print("Already interval exists")
-    #         is_thread = True
-    #     print("Thread {}: {}".format(i, thread.name))
+    for i, thread in running_threads:
+        if "watch_hotel_interval" in thread.name:
+            print("Already interval exists")
+            is_thread = True
+        print("Thread {}: {}".format(i, thread.name))
 
-    # print("Started Main")
+    print("Started Main")
 
     st.set_page_config(layout="wide")
     status = set_env_settings()
 
-    # if not status:
-    #     st.error(
-    #         "Config.js Not a Present! You can't use this app. Please check your config.js")
-    #     exit(0)
+    if not status:
+        st.error(
+            "Config.js Not a Present! You can't use this app. Please check your config.js")
+        exit(0)
 
-    # if not is_thread:
-    #     thread = threading.Thread(target=watch_hotel_interval)
-    #     thread.start()
+    if not is_thread:
+        thread = threading.Thread(target=watch_hotel_interval)
+        thread.start()
 
     main()
