@@ -7,7 +7,7 @@ import smtplib
 import mysql.connector
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -31,28 +31,34 @@ class HintonCalendar:
         self.driver = None
         self.hotel_specs = hotel_specs
 
+        self.arrival_date = datetime.strptime(
+            hotel_specs['arrival_date'], "%Y-%m-%d")
+        self.departure_date = datetime.strptime(
+            hotel_specs['departure_date'], "%Y-%m-%d")
+        self.nights = int(hotel_specs['nights'])
+
     def initialize_driver(self):
 
         chromedriver = os.path.abspath('chrome\\chromedriver.exe')
         self.driver = webdriver.Chrome(chromedriver)
 
         self.driver.set_window_size(1300, 1000)
-        self.driver.implicitly_wait(10)
+        self.driver.implicitly_wait(0.5)
 
     def launch_calendar(self):
         _base_url = self.base_url.replace(
             '{hotel_code}', self.hotel_specs["hotel_code"])
         _base_url = _base_url.replace(
-            '{arrival_date}', self.hotel_specs["arrival_date"])
+            '{arrival_date}', str(self.exc_start_date.date()))
         _base_url = _base_url.replace(
-            '{departure_date}', self.hotel_specs["departure_date"])
+            '{departure_date}', str(self.exc_end_date.date()))
         _base_url = _base_url.replace(
             '{redeem_points}', self.hotel_specs["redeem_points"])
         _base_url = _base_url.replace(
             '{num_of_adults}', self.hotel_specs["num_of_adults"])
         self.current_url = _base_url
         self.driver.get(_base_url)
-        time.sleep(10)
+        time.sleep(7)
         print("Loaded Successfully!")
 
     def gather_active_rooms(self):
@@ -63,20 +69,16 @@ class HintonCalendar:
                 By.CSS_SELECTOR, "[data-testid='noOfRoomsReturned']")
             rooms = room_parent.find_elements(By.XPATH, "./*")
 
-            res["hotel_code"] = self.hotel_specs["hotel_code"]
-            res["arrival_date"] = self.hotel_specs["arrival_date"]
-            res["departure_date"] = self.hotel_specs["departure_date"]
-            res["redeem_points"] = self.hotel_specs["redeem_points"]
-            res["num_of_adults"] = self.hotel_specs["num_of_adults"]
-            res["price_of_watch"] = self.hotel_specs["price_of_watch"]
-            res["email"] = self.hotel_specs["email"]
+            res["from"] = str(self.exc_start_date.date())
+            res["to"] = str(self.exc_end_date.date())
             res["url"] = self.current_url
-
             res["total_room_count"] = len(rooms)
             res["filtered_room_count"] = 0
             res["room_details"] = []
 
             for room_detail_element in rooms:
+                time_logger_st = datetime.now()
+
                 room_detail_info = {}
                 room_detail_info['RoomTypeName'] = room_detail_element.find_element(
                     By.CSS_SELECTOR, "span[data-testid='roomTypeName']").text
@@ -117,6 +119,11 @@ class HintonCalendar:
                 if room_detail_info["QuickBookPriceInt"] < int(self.hotel_specs['price_of_watch']):
                     res["room_details"].append(room_detail_info)
 
+                time_logger_en = datetime.now()
+
+                print("Finished =>", room_detail_info['RoomTypeName'], "in", (
+                    time_logger_en - time_logger_st).microseconds, "ms", str(time_logger_st.time()), str(time_logger_en.time()))
+
             res["filtered_room_count"] = len(res["room_details"])
 
         except Exception as e:
@@ -125,17 +132,31 @@ class HintonCalendar:
         return res
 
     def watch_calendar(self):
-        ret_code, result = False, {}
-        try:
-            self.launch_calendar()
-            result = self.gather_active_rooms()
-            ret_code = True
-        except Exception as e:
-            ret_code = False
-        finally:
-            self.driver.quit()
-            self.driver = None
-        return ret_code, result
+        ret_code, result, total_result = False, {}, {**self.hotel_specs}
+
+        total_result["rooms_by_date"] = []
+
+        for i in range(self.hotel_specs['total_nights']):
+            self.exc_start_date = self.arrival_date + timedelta(days=i)
+            self.exc_end_date = self.exc_start_date + \
+                timedelta(days=self.nights)
+
+            if self.exc_end_date > self.departure_date:
+                break
+            if self.exc_start_date.month != self.arrival_date.month:
+                break
+            try:
+                self.launch_calendar()
+                result = self.gather_active_rooms()
+                ret_code = True
+            except Exception as e:
+                ret_code = False
+            if ret_code:
+                total_result["rooms_by_date"].append(result)
+
+        self.driver.quit()
+        self.driver = None
+        return ret_code, total_result
 
 
 def connect_mysql_database():
@@ -477,11 +498,18 @@ def main():
     )
 
     with st.sidebar:
+        current_date = datetime.now()
+        start_default_date = current_date + timedelta(days=2)
+        end_default_date = start_default_date + timedelta(days=5)
+
         hotel_code = st.text_input('Hotel Code', 'MLEONWA')
-        arrival_date = st.text_input('Arrival Date', '2023-02-11')
-        departure_date = st.text_input('Departure Date', '2023-02-15')
+        arrival_date = st.text_input(
+            'Arrival Date', str(start_default_date.date()))
+        departure_date = st.text_input(
+            'Departure Date', str(end_default_date.date()))
         num_of_adults = st.number_input("Number of Adults", 1)
         price_of_watch = st.number_input("Price of Watch", 6000, step=100)
+        nights = st.number_input("For nights", 1)
 
         email = st.text_input('Email Address', 'example@gmail.com')
         redeem_points = True
@@ -489,12 +517,13 @@ def main():
         if st.button('Submit', disabled=not status, type="primary"):
             date1 = datetime.strptime(arrival_date, "%Y-%m-%d")
             date2 = datetime.strptime(departure_date, "%Y-%m-%d")
-            current_date = datetime.now()
+
+            max_date = date1 + timedelta(days=14)
 
             difference1 = date2 - date1
             difference2 = date1 - current_date
 
-            if difference1.days > 13 or difference1.days < 1 or difference2.days < 1:
+            if difference1.days < 1 or difference2.days < 1:
                 st.error("Please select the correct date!")
                 return
 
@@ -525,14 +554,16 @@ def main():
                         'num_of_adults': str(num_of_adults),
                         'price_of_watch': str(price_of_watch),
                         'redeem_points': str(redeem_points),
+                        'nights': int(nights),
+                        'total_nights': int(difference1.days),
                         'email': email,
                     })
 
-                    send_content_to_email(email, results)
+                    # send_content_to_email(email, results)
                     col2.write(results)
-                    email_notification_status = True
-                    if len(current_email_watch) == 0:
-                        save_data(results)
+                    # email_notification_status = True
+                    # if len(current_email_watch) == 0:
+                    # save_data(results)
 
         if email_notification_status:
             st.success(
@@ -606,24 +637,24 @@ if __name__ == '__main__':
     is_thread = False
     running_threads = enumerate(list(threading.enumerate()))
 
-    for i, thread in running_threads:
-        if "watch_hotel_interval" in thread.name:
-            print("Already interval exists")
-            is_thread = True
-        print("Thread {}: {}".format(i, thread.name))
+    # for i, thread in running_threads:
+    #     if "watch_hotel_interval" in thread.name:
+    #         print("Already interval exists")
+    #         is_thread = True
+    #     print("Thread {}: {}".format(i, thread.name))
 
-    print("Started Main")
+    # print("Started Main")
 
     st.set_page_config(layout="wide")
     status = set_env_settings()
 
-    if not status:
-        st.error(
-            "Config.js Not a Present! You can't use this app. Please check your config.js")
-        exit(0)
+    # if not status:
+    #     st.error(
+    #         "Config.js Not a Present! You can't use this app. Please check your config.js")
+    #     exit(0)
 
-    if not is_thread:
-        thread = threading.Thread(target=watch_hotel_interval)
-        thread.start()
+    # if not is_thread:
+    #     thread = threading.Thread(target=watch_hotel_interval)
+    #     thread.start()
 
     main()
