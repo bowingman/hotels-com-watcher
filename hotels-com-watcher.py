@@ -32,9 +32,9 @@ class HintonCalendar:
         self.hotel_specs = hotel_specs
 
         self.arrival_date = datetime.strptime(
-            hotel_specs['arrival_date'], "%Y-%m-%d")
+            hotel_specs['arrival_date'], "%d-%m-%Y")
         self.departure_date = datetime.strptime(
-            hotel_specs['departure_date'], "%Y-%m-%d")
+            hotel_specs['departure_date'], "%d-%m-%Y")
         self.nights = int(hotel_specs['nights'])
 
     def initialize_driver(self):
@@ -69,8 +69,8 @@ class HintonCalendar:
                 By.CSS_SELECTOR, "[data-testid='noOfRoomsReturned']")
             rooms = room_parent.find_elements(By.XPATH, "./*")
 
-            res["from"] = str(self.exc_start_date.date())
-            res["to"] = str(self.exc_end_date.date())
+            res["from"] = self.exc_start_date.strftime("%d-%m-%Y")
+            res["to"] = self.exc_end_date.strftime("%d-%m-%Y")
             res["url"] = self.current_url
             res["total_room_count"] = len(rooms)
             res["filtered_room_count"] = 0
@@ -180,7 +180,7 @@ def connect_mysql_database():
     else:
         print(f"Table {table_name} does not exist")
 
-        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
         columns = f"( \
             id INT AUTO_INCREMENT PRIMARY KEY, \
             hotel_code VARCHAR(255), \
@@ -226,7 +226,7 @@ def save_data(results):
     conn, cursor = connect_mysql_database()
 
     print("SAVING DATA... \n")
-    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
     values = "( \
         hotel_code, \
@@ -276,7 +276,7 @@ def update_data(id, colname, results):
     conn, cursor = connect_mysql_database()
 
     print("UPDATING DATA... \n")
-    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
     query = f"UPDATE {table_name} SET {colname} = '{json.dumps(results)}', updated_at = '{current_date}' WHERE id = '{id}'"
 
@@ -550,9 +550,9 @@ def main():
 
         hotel_code = st.text_input('Hotel Code', 'MLEONWA')
         arrival_date = st.text_input(
-            'Arrival Date', str(start_default_date.date()))
+            'Arrival Date', start_default_date.strftime("%d-%m-%Y"))
         departure_date = st.text_input(
-            'Departure Date', str(end_default_date.date()))
+            'Departure Date', end_default_date.strftime("%d-%m-%Y"))
         num_of_adults = st.number_input("Number of Adults", 1)
         price_of_watch = st.number_input("Price of Watch", 6000, step=100)
         nights = st.number_input("For nights", 1)
@@ -561,8 +561,8 @@ def main():
         redeem_points = True
 
         if st.button('Submit', disabled=not status, type="primary"):
-            date1 = datetime.strptime(arrival_date, "%Y-%m-%d")
-            date2 = datetime.strptime(departure_date, "%Y-%m-%d")
+            date1 = datetime.strptime(arrival_date, "%d-%m-%Y")
+            date2 = datetime.strptime(departure_date, "%d-%m-%Y")
 
             max_date = date1 + timedelta(days=14)
 
@@ -643,7 +643,7 @@ def watch_hotel_interval():
             print('here', prev_results)
 
             diff = datetime.strptime(
-                prev_results["arrival_date"], "%Y-%m-%d") - current_date
+                prev_results["arrival_date"], "%d-%m-%Y") - current_date
 
             if diff.days < 2:
                 update_data(int(row[0]), "active", False)
