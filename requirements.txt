@@ -1,4 +1,4 @@
-pip==23.0.1
+--upgrade pip
 alembic==1.8.1
 aniso8601==7.0.0
 anyio==3.6.1
