@@ -175,7 +175,7 @@ def connect_mysql_database():
     else:
         print(f"Table {table_name} does not exist")
 
-        current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         columns = f"( \
             id INT AUTO_INCREMENT PRIMARY KEY, \
             hotel_code VARCHAR(255), \
@@ -221,7 +221,7 @@ def save_data(results):
     conn, cursor = connect_mysql_database()
 
     print("SAVING DATA... \n")
-    current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     values = "( \
         hotel_code, \
@@ -271,7 +271,7 @@ def update_data(id, colname, results):
     conn, cursor = connect_mysql_database()
 
     print("UPDATING DATA... \n")
-    current_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     query = f"UPDATE {table_name} SET {colname} = '{json.dumps(results)}', updated_at = '{current_date}' WHERE id = '{id}'"
 
