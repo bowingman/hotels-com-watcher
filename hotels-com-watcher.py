@@ -11,8 +11,7 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
 from email.mime.text import MIMEText
@@ -39,8 +38,11 @@ class HintonCalendar:
 
     def initialize_driver(self):
 
-        chromedriver = os.path.abspath('chrome\\chromedriver.exe')
-        self.driver = webdriver.Chrome(chromedriver)
+        options = Options()
+        options.add_argument('--disable-gpu')
+
+        self.driver = webdriver.Chrome(service=Service(
+            ChromeDriverManager().install()), options=options)
 
         self.driver.set_window_size(1300, 1000)
         self.driver.implicitly_wait(0.5)
@@ -63,6 +65,8 @@ class HintonCalendar:
 
     def gather_active_rooms(self):
         res = {}
+        res["filtered_room_count"] = 0
+        res["room_details"] = []
 
         try:
             room_parent = self.driver.find_element(
@@ -73,8 +77,6 @@ class HintonCalendar:
             res["to"] = self.exc_end_date.strftime("%d-%m-%Y")
             res["url"] = self.current_url
             res["total_room_count"] = len(rooms)
-            res["filtered_room_count"] = 0
-            res["room_details"] = []
 
             for room_detail_element in rooms:
                 time_logger_st = datetime.now()
