@@ -163,12 +163,7 @@ class HintonCalendar:
 
 def connect_mysql_database():
 
-    conn = mysql.connector.connect(
-        host=configs["hostname"],
-        user=configs["username"],
-        password=configs["password"],
-        database=configs["database"]
-    )
+    conn = mysql.connector.connect(**st.secrets["mysql"])
 
     cursor = conn.cursor()
     cursor.execute("SHOW TABLES")
@@ -444,8 +439,8 @@ def send_content_to_email(email, results={}):
 
     try:
         # Gmail account credentials
-        sender_email = configs["user_mail_address"]
-        password = configs["mail_app_key"]
+        sender_email = st.secrets["gmail"]["email_address"]
+        password = st.secrets["gmail"]["mail_app_key"]
 
         # Email recipient and message
         receiver_email = email

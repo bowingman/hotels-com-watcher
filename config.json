@@ -1,9 +1,3 @@
 {
-  "user_mail_address": "gurut.sag@gmail.com",
-  "mail_app_key": "vwtnmhcvdacwcyzq",
-  "hostname": "localhost",
-  "username": "root",
-  "password": "",
-  "database": "hotel-watch",
   "base_url": "https://www.hilton.com/en/book/reservation/rooms/?ctyhocn={hotel_code}&arrivalDate={arrival_date}&departureDate={departure_date}&redeemPts={redeem_points}&room1NumAdults={num_of_adults}"
 }
