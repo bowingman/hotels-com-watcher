@@ -1,0 +1,10 @@
+[requires]
+pip = "==23.0.1"
+
+[packages]
+streamlit = "*"
+pandas = "*"
+numpy = "*"
+
+[dev-packages]
+pytest = "*"
