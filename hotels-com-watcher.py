@@ -40,6 +40,7 @@ class HintonCalendar:
 
         options = Options()
         options.add_argument('--disable-gpu')
+        options.add_argument('--headless')
 
         self.driver = webdriver.Chrome(service=Service(
             ChromeDriverManager().install()), options=options)
