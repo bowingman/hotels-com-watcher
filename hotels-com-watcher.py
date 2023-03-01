@@ -673,7 +673,7 @@ def watch_hotel_interval():
 if __name__ == '__main__':
     print("__main__")
 
-    is_thread = False
+    is_thread, is_join = False, False
     running_threads = enumerate(list(threading.enumerate()))
     thread_count = len(list(threading.enumerate()))
 
@@ -681,7 +681,9 @@ if __name__ == '__main__':
 
     for i, thread in running_threads:
         if is_thread and "Thread-" in thread.name:
-            thread.join()
+            if is_join:
+                thread.join()
+            is_join = True
         if "watch_hotel_interval" in thread.name:
             print("Already interval exists")
             is_thread = True
