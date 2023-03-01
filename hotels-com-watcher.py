@@ -389,10 +389,6 @@ def generate_email_body(results):
     )
 
     room_details = ""
-    if len(room["SubInfo"]) > 0:
-        sub_info = room["SubInfo"]
-    else:
-        sub_info = ' '
 
     for items in results["rooms_by_date"]:
         room_details += """
@@ -412,6 +408,11 @@ def generate_email_body(results):
                     <ul>
             """
         for room in items["room_details"]:
+
+            if len(room["SubInfo"]) > 0:
+                sub_info = room["SubInfo"]
+            else:
+                sub_info = ' '
 
             sub_room_details += """
             <li>
