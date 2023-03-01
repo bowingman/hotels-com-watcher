@@ -98,9 +98,12 @@ class HintonCalendar:
                 try:
                     room_detail_info["PayWithPoint"] = room_detail_element.find_element(
                         By.CSS_SELECTOR, "div[data-testid='pamNotLoggedInMessage']").text
+                    room_detail_info["PayWithPointInt"] = int(
+                        room_detail_info["PayWithPoint"].split(' ')[3].replace(",", ""))
                 except Exception as e:
                     print(e)
                     room_detail_info["PayWithPoint"] = None
+                    room_detail_info["PayWithPointInt"] = 0
 
                 try:
                     room_detail_info["QuickBookPrice"] = room_detail_element.find_element(
@@ -119,7 +122,7 @@ class HintonCalendar:
                     print(e)
                     room_detail_info["MoreRatesPrice"] = None
 
-                if room_detail_info["QuickBookPriceInt"] < int(self.hotel_specs['price_of_watch']):
+                if room_detail_info["PayWithPointInt"] < int(self.hotel_specs['price_of_watch']):
                     res["room_details"].append(room_detail_info)
 
                 time_logger_en = datetime.now()
@@ -553,7 +556,8 @@ def main():
         departure_date = st.text_input(
             'Departure Date', end_default_date.strftime("%d-%m-%Y"))
         num_of_adults = st.number_input("Number of Adults", 1)
-        price_of_watch = st.number_input("Price of Watch", 6000, step=100)
+        price_of_watch = st.number_input(
+            "Price of Watch(POINTS)", 1500000, step=1000)
         nights = st.number_input("For nights", 1)
 
         email = st.text_input('Email Address', 'example@gmail.com')
