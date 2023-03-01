@@ -11,10 +11,8 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.chrome.options import Options
-
-from email.mime.text import MIMEText
 
 
 configs = None
@@ -38,15 +36,17 @@ class HintonCalendar:
 
     def initialize_driver(self):
 
-        options = Options()
-        options.add_argument('--disable-gpu')
-        options.add_argument('--headless')
-
-        self.driver = webdriver.Chrome(service=Service(
-            ChromeDriverManager().install()), options=options)
+        firefoxOptions = Options()
+        firefoxOptions.add_argument("--headless")
+        service = Service(GeckoDriverManager().install())
+        self.driver = webdriver.Firefox(
+            options=firefoxOptions,
+            service=service,
+        )
 
         self.driver.set_window_size(1300, 1000)
         self.driver.implicitly_wait(0.5)
+        time.sleep(2)
 
     def launch_calendar(self):
         _base_url = self.base_url.replace(
