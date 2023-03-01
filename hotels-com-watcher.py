@@ -680,7 +680,7 @@ if __name__ == '__main__':
     print(thread_count)
 
     for i, thread in running_threads:
-        if is_thread and i < thread_count - 3:
+        if is_thread and "Thread-" in thread.name:
             thread.join()
         if "watch_hotel_interval" in thread.name:
             print("Already interval exists")
