@@ -453,12 +453,12 @@ def send_content_to_email(email, results={}):
 
         # Compose the email message
         message = """From: You <{sender_email}>
-            To: Recipient <{receiver_email}>
-            Subject: The results of Hotel Resarch
-            MIME-Version: 1.0
-            Content-type: text/html
-            {body}
-        """.format(sender_email=sender_email, receiver_email=receiver_email, body=body)
+To: Recipient <{receiver_email}>
+Subject: The results of Hotel Resarch
+MIME-Version: 1.0
+Content-type: text/html
+{body}
+""".format(sender_email=sender_email, receiver_email=receiver_email, body=body)
 
         # Connect to the Gmail SMTP server and send the email
 
