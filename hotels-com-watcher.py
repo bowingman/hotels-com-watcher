@@ -452,12 +452,12 @@ def send_content_to_email(email, results={}):
 
         # Compose the email message
         message = """From: You <{sender_email}>
-To: Recipient <{receiver_email}>
-Subject: The results of Hotel Resarch
-MIME-Version: 1.0
-Content-type: text/html
-{body}
-""".format(sender_email=sender_email, receiver_email=receiver_email, body=body)
+            To: Recipient <{receiver_email}>
+            Subject: The results of Hotel Resarch
+            MIME-Version: 1.0
+            Content-type: text/html
+            {body}
+        """.format(sender_email=sender_email, receiver_email=receiver_email, body=body)
 
         # Connect to the Gmail SMTP server and send the email
 
@@ -627,8 +627,6 @@ def main():
 
 
 def watch_hotel_interval():
-    print("watch_hotel_interval")
-
     while True:
         time.sleep(21600)
 
@@ -695,7 +693,8 @@ if __name__ == '__main__':
         exit(0)
 
     if not is_thread:
-        thread = threading.Thread(target=watch_hotel_interval)
+        thread = threading.Thread(
+            target=watch_hotel_interval, name="watch_hotel_interval")
         thread.start()
 
     main()
